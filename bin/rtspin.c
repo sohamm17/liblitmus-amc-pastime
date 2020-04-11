@@ -45,8 +45,11 @@ const char *usage_msg =
 	"    -c be|srt|hrt     task class (best-effort, soft real-time, hard real-time)\n"
 	"    -d DEADLINE       relative deadline, equal to the period by default (in ms)\n"
 	"    -e                turn on budget enforcement (off by default)\n"
+	"    -f                LO-response time of the task\n"
+	"    -g                AMC*-response time of the task\n"
 	"    -h                show this help message\n"
 	"    -i                report interrupts (implies -v)\n"
+	"    -j                HI-execution time for AMC\n"
 	"    -l                run calibration loop and report error\n"
 	"    -m FOOTPRINT      specify number of data pages to access\n"
 	"    -o OFFSET         offset (also known as phase), zero by default (in ms)\n"
@@ -336,7 +339,7 @@ static lt_t choose_inter_arrival_time_ns(
 	return ms2ns(iat_ms);
 }
 
-#define OPTSTR "p:c:wlveo:s:m:q:r:X:L:Q:iRu:U:Bhd:C:S::O::TD:E:A:a:"
+#define OPTSTR "j:g:f:p:c:wlveo:s:m:q:r:X:L:Q:iRu:U:Bhd:C:S::O::TD:E:A:a:"
 
 int main(int argc, char** argv)
 {
@@ -402,6 +405,14 @@ int main(int argc, char** argv)
 	const char *lock_namespace = "./rtspin-locks";
 	int protocol = -1;
 	double cs_length = 1; /* millisecond */
+  int crit_counter = 0; // used for counter in assigning higher crit exec times
+
+  /*low-respone time --SS--*/
+  lt_t r_lo = 0; double r_lo_ms = 0;
+  /*amc*-response time --SS--*/
+  lt_t r_star = 0; double r_star_ms = 0;
+  /* HI-runtime --SS--*/
+  lt_t wcet_hi = 0; double wcet_hi_ms = 0;
 
 	progname = argv[0];
 
@@ -414,6 +425,17 @@ int main(int argc, char** argv)
 			cluster = want_non_negative_int(optarg, "-p");
 			migrate = 1;
 			break;
+    /*--SS-- This is for AMC Online tests --SS-- */
+		case 'f':
+			r_lo_ms = want_non_negative_double(optarg, "-f");
+			break;
+		case 'g':
+			r_star_ms = want_non_negative_double(optarg, "-g");
+			break;
+		case 'j':
+			wcet_hi_ms = want_positive_double(optarg, "-j");
+			break;
+    /*End of AMC requirements --SS-- */
 		case 'r':
 			reservation = want_non_negative_int(optarg, "-r");
 			break;
@@ -515,8 +537,8 @@ int main(int argc, char** argv)
 			break;
 		case 'U':
 			underrun_frac = want_positive_double(optarg, "-U");
-			if (underrun_frac > 1)
-				usage("-U: argument must be in the range (0, 1]");
+			/*if (underrun_frac > 1)
+				usage("-U: argument must be in the range (0, 1]");*/
 			break;
 		case 'X':
 			protocol = lock_protocol_for_name(optarg);
@@ -609,10 +631,13 @@ int main(int argc, char** argv)
 	wcet_ms   = want_positive_double(argv[optind + 0], "WCET");
 	period_ms = want_positive_double(argv[optind + 1], "PERIOD");
 
-	wcet   = ms2ns(wcet_ms);
-	period = ms2ns(period_ms);
-	phase  = ms2ns(offset_ms);
-	deadline = ms2ns(deadline_ms);
+	wcet      =  ms2ns(wcet_ms);
+	period    =  ms2ns(period_ms);
+	phase     =  ms2ns(offset_ms);
+  r_lo      =  ms2ns(r_lo_ms);
+  r_star    =  ms2ns(r_star_ms);
+  wcet_hi   =  ms2ns(wcet_hi_ms);
+	deadline  =  ms2ns(deadline_ms);
 	if (wcet <= 0)
 		usage("The worst-case execution time must be a "
 				"positive number.");
@@ -656,6 +681,7 @@ int main(int argc, char** argv)
 
 	init_rt_task_param(&param);
 	param.exec_cost = wcet;
+	param.exec_cost_hi = wcet_hi;
 	param.period = period;
 	param.phase  = phase;
 	param.relative_deadline = deadline;
@@ -663,6 +689,17 @@ int main(int argc, char** argv)
 	param.cls = class;
 	param.budget_policy = (want_enforcement) ?
 			PRECISE_ENFORCEMENT : NO_ENFORCEMENT;
+  param.r_lo = r_lo;
+  param.r_star = r_star;
+  // --SS-- adding higher criticality times
+  for(crit_counter = 0; crit_counter < 4; crit_counter++) {
+    // just multiplying by the criticality level to get WCET at that criticality
+    // level
+    if (class == RT_CLASS_HARD)
+      param.exec_cost_crit[crit_counter] = wcet * (crit_counter + 2);
+    else
+      param.exec_cost_crit[crit_counter] = wcet / (crit_counter + 2);
+  }
 	if (migrate) {
 		if (reservation >= 0)
 			param.cpu = reservation;

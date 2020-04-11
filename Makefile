@@ -44,7 +44,7 @@ headers += -I${LIBLITMUS}/arch/${include-${ARCH}}/include/uapi
 headers += -I${LIBLITMUS}/arch/${include-${ARCH}}/include/generated/uapi
 
 # combine options
-CPPFLAGS = ${flags-api} ${flags-${ARCH}} -DARCH=${ARCH} ${headers}
+CPPFLAGS = ${flags-api} ${flags-${ARCH}} -DARCH=${ARCH} ${headers} -fPIC
 CFLAGS   = ${flags-debug}
 LDFLAGS  = ${flags-${ARCH}}
 

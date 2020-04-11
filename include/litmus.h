@@ -455,9 +455,9 @@ static inline int open_dflp_sem(int fd, int name, int cpu)
 
 /**
  * Get budget information from the scheduler (in nanoseconds).
- * @param expended pointer to time value in wich the total
+ * @param expended pointer to time value in which the total
  *        amount of already used-up budget will be stored.
- * @param remaining pointer to time value in wich the total
+ * @param remaining pointer to time value in which the total
  *        amount of remaining budget will be stored.
  */
 
@@ -477,6 +477,12 @@ int null_call(cycles_t *timestamp);
  * but it is very general and can be used for different purposes
  */
 struct control_page* get_ctrl_page(void);
+
+/**
+ * Set rt_param:
+ * @return the same pointer filled up with values
+ *
+ */
 
 #ifdef __cplusplus
 }

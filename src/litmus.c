@@ -173,7 +173,8 @@ int init_litmus(void)
 {
 	int ret, ret2;
 
-	ret = mlockall(MCL_CURRENT | MCL_FUTURE);
+  // --SS-- testing with not pinning memory to RAM
+	ret = 0;//mlockall(MCL_CURRENT | MCL_FUTURE);
 	check("mlockall()");
 	ret2 = init_rt_thread();
 	return (ret == 0) && (ret2 == 0) ? 0 : -1;
